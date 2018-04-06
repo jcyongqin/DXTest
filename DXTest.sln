@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXTest", "DXTest\DXTest.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDLStartup", "SDLStartup\SDLStartup.vcxproj", "{21138F55-84B5-4AA1-B3FD-58AF7F2ADCF9}"
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "PySDL2Test", "PySDL2Test\PySDL2Test.pyproj", "{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -37,6 +39,12 @@ Global
 		{21138F55-84B5-4AA1-B3FD-58AF7F2ADCF9}.Release|x64.Build.0 = Release|x64
 		{21138F55-84B5-4AA1-B3FD-58AF7F2ADCF9}.Release|x86.ActiveCfg = Release|Win32
 		{21138F55-84B5-4AA1-B3FD-58AF7F2ADCF9}.Release|x86.Build.0 = Release|Win32
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|x64.ActiveCfg = Release|Any CPU
+		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

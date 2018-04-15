@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDLStartup", "SDLStartup\SD
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "PySDL2Test", "PySDL2Test\PySDL2Test.pyproj", "{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DX9DrawLine", "DX9DrawLine\DX9DrawLine.vcxproj", "{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,16 @@ Global
 		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|x64.ActiveCfg = Release|Any CPU
 		{47339C78-EAA7-4F27-BB50-A71DCCE38B1D}.Release|x86.ActiveCfg = Release|Any CPU
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Debug|x64.ActiveCfg = Debug|x64
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Debug|x64.Build.0 = Debug|x64
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Debug|x86.ActiveCfg = Debug|Win32
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Debug|x86.Build.0 = Debug|Win32
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Release|Any CPU.ActiveCfg = Release|Win32
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Release|x64.ActiveCfg = Release|x64
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Release|x64.Build.0 = Release|x64
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Release|x86.ActiveCfg = Release|Win32
+		{E0D1F4D7-A882-44E5-BC3D-64F404A8F206}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

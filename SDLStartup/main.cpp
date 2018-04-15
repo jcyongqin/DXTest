@@ -2,6 +2,12 @@
 #include "main.h"
 #include <vector>
 
+
+void mmain()
+{
+	CWindow wnd;
+
+}
 const int SCREEN_WIDTH = 1080;
 const int SCREEN_HEIGHT = 960;
 //We'll just be using square tiles for now
@@ -163,3 +169,4 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	return 0;
 }
+ 

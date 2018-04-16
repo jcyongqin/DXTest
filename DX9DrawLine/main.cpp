@@ -1,11 +1,12 @@
 #include "stdafx.h"
 #include "main.h"
 #include <functional>
+#include <minwinbase.h>
 
-// 7 像素窗口边框 25像素标题栏
-#define null nullptr
+// 8 像素窗口边框 25像素标题栏
 
 using namespace BlankWindow;
+using namespace Microsoft::WRL;
 
 namespace BlankWindow
 {
@@ -14,44 +15,29 @@ namespace BlankWindow
 		HINSTANCE hInst;
 		PCWSTR className;
 		//PWSTR windowName;
-		HWND hThis;
-		WNDCLASSEXW wc = { sizeof(WNDCLASSEX), /*CS_VREDRAW | CS_HREDRAW ||CS_CLASSDC*/NULL // 窗口改变大小时重绘整个窗口
-			, MsgProc, 0L, 0L,
-			hInst, NULL, NULL,  CreateSolidBrush(RGB(255, 255, 255)), NULL,
-			className, NULL };
-		WORD create(PCWSTR wndName, int X, int Y)
-		{
-			hThis = CreateWindowExW(0L, className, wndName,  /*WS_POPUP | WS_VISIBLE | WS_CAPTION*/ WS_THICKFRAME | NULL,
-				CW_USEDEFAULT, CW_USEDEFAULT, X, Y,
-				null, null, hInst, this);
-			if (hThis == null)
-			{
-				return FALSE;
-			}
-			return TRUE;
-		}
-		BOOL show(int nShowCmd)
-		{
-			ShowWindow(hThis, nShowCmd);
-			UpdateWindow(hThis);
-			return TRUE;
-		}
-		WORD createAndShow(PCWSTR wndName, int nShowCmd)
-		{
+		HWND hWnd;
+		WNDCLASSEXW wc = { 0 };
 
-			create(wndName, 480, 360);
-			show(nShowCmd);
-			return TRUE;
-		}
+		DWORD wndStyle;
+		UINT wndClassStyle;
+
 		BOOL init(PCWSTR clsName)
 		{
+			wndClassStyle = NULL | CS_DBLCLKS /*CS_VREDRAW | CS_HREDRAW ||CS_CLASSDC*/; // 窗口改变大小时重绘整个窗口
+			wndStyle = NULL | WS_THICKFRAME /*WS_POPUP | WS_VISIBLE | WS_CAPTION*/;
+
 			hInst = GetModuleHandleW(nullptr);
-			if (hInst == null)
+			if (hInst == nullptr)
 			{
 				return FALSE;
 			}
+			wc.cbSize = sizeof(WNDCLASSEX);
+			wc.style = wndClassStyle;
+			wc.lpfnWndProc = MsgProc;
 			wc.hInstance = hInst;
+			wc.hbrBackground = CreateSolidBrush(RGB(255, 255, 255));
 			wc.lpszClassName = className = clsName;
+
 			return RegisterClassExW(&wc);
 			//return TRUE;
 		}
@@ -87,12 +73,41 @@ namespace BlankWindow
 				return DefWindowProcW(hWnd, msg, wParam, lParam);
 			}
 			return 0;
-
-
 		}
-		int Run(const std::function<void()> func)
+
+		WORD create(PCWSTR wndName, int X, int Y)
+		{
+			hWnd = CreateWindowExW(0L, className, wndName, wndStyle,
+				CW_USEDEFAULT, CW_USEDEFAULT, X, Y,
+				nullptr, nullptr, hInst, this);
+			if (hWnd == nullptr)
+			{
+				return FALSE;
+			}
+			return TRUE;
+		}
+
+		BOOL show(int nShowCmd)
+		{
+			ShowWindow(hWnd, nShowCmd);
+			UpdateWindow(hWnd);
+			return TRUE;
+		}
+
+		WORD createAndShow(PCWSTR wndName, int nShowCmd)
+		{
+
+			create(wndName, 480, 360);
+			show(nShowCmd);
+			return TRUE;
+		}
+
+
+
+		int Run(const std::function<void(DWORD)> func)
 		{
 			MSG msg;
+			static DWORD lastTime = GetTickCount();
 
 			//初始化消息结构
 			ZeroMemory(&msg, sizeof(MSG));
@@ -101,101 +116,98 @@ namespace BlankWindow
 			{
 				if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
 				{
-					func();
 					TranslateMessage(&msg);
 					DispatchMessageW(&msg);
 				}
 				else
 				{
-					func();
+					DWORD  currTime = GetTickCount();
+					func(currTime - lastTime);
+					lastTime = currTime;
 					Sleep(10);
 				}
 			}
-			return msg.wParam;
+			return int(msg.wParam);
 		}
 
 	};
 	struct Window {};
 
 
-}
-
-
-bool InitializeD3D(HWND hWnd, bool fullscreen, IDirect3D9 ** D3D, IDirect3DDevice9 ** D3DDevice)
-{
-	D3DDISPLAYMODE displayMode;
-	IDirect3D9 * g_D3D;
-	IDirect3DDevice9 * g_D3DDevice;
-	// Create the D3D object.  
-	g_D3D = Direct3DCreate9(D3D_SDK_VERSION);
-	if (g_D3D == NULL) return false;
-	// Get the desktop display mode.  
-	if (FAILED(g_D3D->GetAdapterDisplayMode(D3DADAPTER_DEFAULT, &displayMode)))
-		return false;
-	// Set up the structure used to create the D3DDevice  
-	D3DPRESENT_PARAMETERS d3dpp;
-	ZeroMemory(&d3dpp, sizeof(d3dpp));
-	if (fullscreen)
+	bool InitializeD3D(HWND hWnd, bool fullscreen, ComPtr<IDirect3D9> &dx9Obj, ComPtr<IDirect3DDevice9> &dx9Device)
 	{
-		d3dpp.Windowed = FALSE;
-		d3dpp.BackBufferWidth = 1920;
-		d3dpp.BackBufferHeight = 1080;
+		D3DCAPS9 caps;
+		int vp = 0; // 保存定点处理单元（硬件/软件）
+		IDirect3DDevice9  *pDevice;
+		D3DPRESENT_PARAMETERS d3dpp = { 0 };
+		//
+		d3dpp.BackBufferWidth = 1280;
+		d3dpp.BackBufferHeight = 960;
+		d3dpp.BackBufferFormat = D3DFMT_A8R8G8B8;
+		d3dpp.BackBufferCount = 1;
+		d3dpp.MultiSampleType = D3DMULTISAMPLE_NONE;
+		d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+		d3dpp.hDeviceWindow = hWnd;
+		d3dpp.Windowed = BOOL(!fullscreen);
+		d3dpp.EnableAutoDepthStencil = true;
+		d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;
+		d3dpp.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
+		d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+		//
+		dx9Obj.Attach(Direct3DCreate9(D3D_SDK_VERSION));
+		dx9Obj->GetDeviceCaps(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, &caps);
+		vp = (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) ? D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+		HRESULT hr = dx9Obj->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, vp, &d3dpp, &pDevice);
+		dx9Device.Attach(pDevice);
+		return FAILED(hr) ? false : true;
 	}
-	else
-		d3dpp.Windowed = TRUE;
-	d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-	d3dpp.BackBufferFormat = displayMode.Format;
-	// Create the D3DDevice  
-	HRESULT hr = g_D3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &d3dpp, &g_D3DDevice);
-	*D3D = g_D3D;
-	*D3DDevice = g_D3DDevice;
-	return SUCCEEDED(hr);
+
+	bool InitializeObjects(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuffer9> &dx9VB, size_t vertexArrSize, void * vertexArrPtr, DWORD d3dfvfStyle)
+	{
+		IDirect3DVertexBuffer9 *pVB;
+		// Create the vertex buffer.  
+		if (FAILED(dx9Device->CreateVertexBuffer(vertexArrSize, 0, d3dfvfStyle, D3DPOOL_DEFAULT, &pVB, NULL))) return false;
+		// Fill the vertex buffer.  
+		void *ptr;
+		if (FAILED(pVB->Lock(0, vertexArrSize, (void**)&ptr, 0))) return false;
+		memcpy(ptr, vertexArrPtr, vertexArrSize);
+		pVB->Unlock();
+		dx9VB.Attach(pVB);
+		return true;
+	}
 }
 
-bool InitializeObjects(IDirect3DDevice9 * Device, IDirect3DVertexBuffer9 ** VB, size_t vertexArrSize, void * vertexArrPtr, DWORD d3dfvfStyle)
-{
 
-	// Create the vertex buffer.  
-	if (FAILED(Device->CreateVertexBuffer(vertexArrSize, 0, d3dfvfStyle, D3DPOOL_DEFAULT, VB, NULL))) return false;
-	// Fill the vertex buffer.  
-	void *ptr;
-	if (FAILED((*VB)->Lock(0, vertexArrSize, (void**)&ptr, 0))) return false;
-	memcpy(ptr, vertexArrPtr, vertexArrSize);
-	(*VB)->Unlock();
-	return true;
-}
-
-void RenderScene(IDirect3DDevice9 * Device, IDirect3DVertexBuffer9 * VB, size_t VBobjSize, DWORD d3dfvfStyle)
+void RenderScene(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuffer9> &dx9VB, size_t VBobjSize, DWORD d3dfvfStyle)
 {
 	// Clear the backbuffer.  
-	Device->Clear(0, NULL, D3DCLEAR_TARGET,
+	dx9Device->Clear(0, NULL, D3DCLEAR_TARGET,
 		D3DCOLOR_XRGB(0x66, 0x99, 0xff), 1.0f, 0);
 	// Begin the scene. Start rendering.  
-	Device->BeginScene();
+	dx9Device->BeginScene();
 
 	// Render object.  
-	Device->SetStreamSource(0, VB, 0, VBobjSize);
-	Device->SetFVF(d3dfvfStyle);
-	Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
+	dx9Device->SetStreamSource(0, dx9VB.Get(), 0, VBobjSize);
+	dx9Device->SetFVF(d3dfvfStyle);
+	dx9Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
 
 	//
-	Device->SetFVF(d3dfvfStyle);
-	Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
+	dx9Device->SetFVF(d3dfvfStyle);
+	dx9Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
 	//
 
 	// End the scene. Stop rendering.  
-	Device->EndScene();
+	dx9Device->EndScene();
 	// Display the scene.  
-	Device->Present(NULL, NULL, NULL, NULL);
+	dx9Device->Present(NULL, NULL, NULL, NULL);
 
 }
 
-void Shutdown(IDirect3D9 * g_D3D, IDirect3DDevice9 * g_D3DDevice, IDirect3DVertexBuffer9 * VB)
+void Shutdown(ComPtr<IDirect3D9> dx9Obj, ComPtr<IDirect3DDevice9> dx9Device, ComPtr<IDirect3DVertexBuffer9> dx9VB)
 {
-	if (g_D3DDevice != NULL) g_D3DDevice->Release();
-	if (g_D3D != NULL) g_D3D->Release();
-	if (VB != NULL) g_D3D->Release();
-
+	dx9Obj.Reset();
+	dx9Device.Reset();
+	dx9VB.Reset();
 }
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInst,
@@ -208,9 +220,11 @@ int WINAPI wWinMain(
 	app.createAndShow(L"标题党", nShowCmd);
 
 	// Direct3D object and device.  
-	LPDIRECT3D9 g_D3D = NULL;
-	LPDIRECT3DDEVICE9 g_D3DDevice = NULL;
-	LPDIRECT3DVERTEXBUFFER9 g_D3DVB = NULL;
+	ComPtr<IDirect3D9> dx9Obj;
+	ComPtr<IDirect3DDevice9> dx9Device;
+	ComPtr<IDirect3DSurface9> dx9Surface;
+	ComPtr<IDirect3DVertexBuffer9> dx9VB;
+
 
 	// Game Object
 	struct stD3DVertex
@@ -219,7 +233,7 @@ int WINAPI wWinMain(
 		D3DVECTOR pos;
 		D3DCOLOR color;
 	};
-	const D3DCOLOR yellow = D3DCOLOR_ARGB(255, 255, 255, 255);
+	const D3DCOLOR yellow = D3DCOLOR_XRGB(255, 255, 255);
 
 	stD3DVertex objData[] = {
 		{ -0.5f, 0.5f, 0.5f, yellow, },
@@ -227,41 +241,32 @@ int WINAPI wWinMain(
 		{ 0.5f, 0.5f, 0.5f, yellow, },
 		{ 0.5f, -0.5f, 0.5f, yellow, } };
 
-	const DWORD d3dfvfStyle = (D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+	const DWORD d3dfvfStyle = (D3DFVF_XYZ | D3DFVF_DIFFUSE);
 
 
-	InitializeD3D(app.hThis, FALSE, &g_D3D, &g_D3DDevice);
-	InitializeObjects(g_D3DDevice, &g_D3DVB, sizeof(objData), objData, d3dfvfStyle);
+	InitializeD3D(app.hWnd, FALSE, dx9Obj, dx9Device);
+	InitializeObjects(dx9Device, dx9VB, sizeof(objData), objData, d3dfvfStyle);
 
-	app.Run([=]() // 值传递指针
+	app.Run([&](DWORD deltaTime) // 值传递指针
 	{
 		//RenderScene(g_D3DDevice,g_D3DVB,sizeof(stD3DVertex), d3dfvfStyle);
 
 		// Clear the backbuffer.  
-		g_D3DDevice->Clear(0, NULL, D3DCLEAR_TARGET,
-			D3DCOLOR_XRGB(0x66, 0x99, 0xff), 1.0f, 0);
+		dx9Device->Clear(0, NULL, D3DCLEAR_TARGET,
+			D3DCOLOR_XRGB(0x66, 0x99, 0xff), 0.5f, 0);
 		// Begin the scene. Start rendering.  
-		g_D3DDevice->BeginScene();
+		dx9Device->BeginScene();
 
-		DWORD assdasd;
-
-		g_D3DDevice->GetFVF(&assdasd);
-		// Render object.  
-		//g_D3DDevice->SetStreamSource(0, VB, 0, VBobjSize);
-		g_D3DDevice->SetFVF(d3dfvfStyle);
-		auto as = sizeof stD3DVertex;
-		auto hr=g_D3DDevice->DrawPrimitiveUP(D3DPT_LINELIST, 2, (void *)objData, sizeof stD3DVertex);
-
-		if (FAILED(hr))return FALSE;
-
+		RenderScene(dx9Device, dx9VB, sizeof(objData), d3dfvfStyle);
 		// End the scene. Stop rendering.  
-		g_D3DDevice->EndScene();
+		dx9Device->EndScene();
 		// Display the scene.  
-		g_D3DDevice->Present(NULL, NULL, NULL, NULL);
+		dx9Device->Present(nullptr, nullptr, nullptr, nullptr);
 
+		return;
 	});
 
-	Shutdown(g_D3D, g_D3DDevice, g_D3DVB);
+	Shutdown(dx9Obj, dx9Device, dx9VB);
 	return 0;
 }
 

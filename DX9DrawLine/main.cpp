@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "main.h"
 #include <functional>
-#include <minwinbase.h>
+
+
+
 
 // 8 像素窗口边框 25像素标题栏
 
@@ -10,7 +12,180 @@ using namespace Microsoft::WRL;
 
 namespace BlankWindow
 {
-	struct Application
+	class Window
+	{
+	private:
+		HWND hWnd;
+		HINSTANCE hInstance;
+	public:
+		Window() = default;
+		Window(HINSTANCE Inst) :hWnd(nullptr), hInstance(Inst) {}
+
+		static LRESULT CALLBACK staticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+			Window* window = reinterpret_cast<Window*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+			if (window==nullptr)
+			{
+				return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+			}
+			if (WM_NCCREATE == uMsg) {
+			
+				if (window != nullptr)
+				{
+					window->attach(hWnd);
+					SetWindowLongPtrW(hWnd, GWLP_USERDATA, LONG_PTR(window));
+				}
+				else
+				{
+					/*createwindow没有正确传递Window指针 */
+				}
+			}
+			else
+			{
+		
+				return window->dynamicWndProc(uMsg, wParam, lParam);
+			}
+
+			return 0;
+		}
+
+
+		LRESULT dynamicWndProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			RECT rc;
+			switch (uMsg)
+			{
+			case WM_DESTROY:
+				PostQuitMessage(0);
+				break;
+			case WM_KEYUP:
+				DestroyWindow(hWnd);
+				break;
+			case WM_CREATE:
+				//SetWindowPos(hWnd, HWND_TOPMOST, 300, 300, 480, 360, FALSE);
+				//MoveWindow(hWnd, 300, 300, 480, 360, TRUE);
+			case WM_PAINT:
+				PAINTSTRUCT pc;
+
+				BeginPaint(hWnd, &pc);
+				GetWindowRect(hWnd, &rc);
+				GetClientRect(hWnd, &rc);
+				rc.top += 2;
+				rc.left += 2;
+				rc.bottom -= 2;
+				rc.right -= 2;
+				FillRect(pc.hdc, &rc, HBRUSH(BLACK_BRUSH));
+				EndPaint(hWnd, &pc);
+				break;
+			default:
+				return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+			}
+		}
+
+		bool attach(HWND wnd)
+		{
+			if (hWnd != nullptr)
+			{
+				DestroyWindow(hWnd);
+			}
+			hWnd = wnd;
+			return (GetWindowLongPtrW(hWnd, GWLP_USERDATA) == LONG_PTR(this)) ? true : false;
+		}
+
+		bool registerClass(PCWSTR className)
+		{
+			WNDCLASSEXW wcex = { 0 };
+
+			wcex.cbSize = sizeof(WNDCLASSEX);
+			wcex.style = CS_HREDRAW | CS_VREDRAW | CS_CLASSDC;
+			wcex.lpfnWndProc = staticWndProc;
+			wcex.hInstance = hInstance;
+			wcex.hbrBackground = HBRUSH(GRAY_BRUSH);
+			wcex.cbWndExtra = sizeof(this);
+			wcex.lpszClassName = className;
+
+			return RegisterClassExW(&wcex);
+		}
+
+		bool createWindow(PCWSTR className, PCWSTR wndName, int width, int height)
+		{
+			registerClass(className);
+			hWnd = CreateWindowW(className, wndName, WS_OVERLAPPEDWINDOW,
+				CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, PVOID(this));
+			//hWnd = CreateWindowExW(0L, className, wndName, WS_POPUP, CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr, hInstance, PVOID(this));
+			return hWnd == nullptr ? false : true;
+		}
+
+		bool show(int nShowCmd)
+		{
+			ShowWindow(hWnd, nShowCmd);
+			return true;
+		}
+
+		explicit operator HWND() const
+		{
+			return this->hWnd;
+		}
+
+	};
+
+	static class Application {
+	private:
+		HINSTANCE hInst = nullptr;
+	public:
+		Application() = default;
+
+		bool init()
+		{
+			this->hInst = GetModuleHandleW(nullptr);
+			return (this->hInst == nullptr) ? false : true;;
+		}
+
+		bool attach(HINSTANCE inst)
+		{
+			return inst == nullptr && ((this->hInst = inst)) ? false : true;
+		}
+
+		Window * createWindow(PCWSTR windowName, int width, int height)
+		{
+			Window *wnd = new Window(hInst);
+			wchar_t* className = new wchar_t[20]{ 0 };
+			wcscat_s(className, 20, windowName);
+			wcscat_s(className, 20, L"_class_");
+
+			wnd->createWindow(className, windowName, width, height);
+			return wnd;
+		}
+
+		int Run(const std::function<void()> func)
+		{
+			MSG msg;
+			static DWORD lastTime = GetTickCount();
+
+			//初始化消息结构
+			ZeroMemory(&msg, sizeof(MSG));
+
+			while (msg.message != WM_QUIT)
+			{
+				if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
+				{
+					TranslateMessage(&msg);
+					DispatchMessageW(&msg);
+				}
+				else
+				{
+					DWORD  currTime = GetTickCount();
+					func();
+					lastTime = currTime;
+					Sleep(10);
+				}
+			}
+			return int(msg.wParam);
+		}
+
+	} app;
+
+
+	struct _Application
 	{
 		HINSTANCE hInst;
 		PCWSTR className;
@@ -33,7 +208,7 @@ namespace BlankWindow
 			}
 			wc.cbSize = sizeof(WNDCLASSEX);
 			wc.style = wndClassStyle;
-			wc.lpfnWndProc = MsgProc;
+			wc.lpfnWndProc = 0;
 			wc.hInstance = hInst;
 			wc.hbrBackground = CreateSolidBrush(RGB(255, 255, 255));
 			wc.lpszClassName = className = clsName;
@@ -42,38 +217,9 @@ namespace BlankWindow
 			//return TRUE;
 		}
 
-		static LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
-		{
-			RECT rc;
-			switch (msg)
-			{
-			case WM_DESTROY:
-				PostQuitMessage(0);
-				break;
-			case WM_KEYUP:
-				DestroyWindow(hWnd);
-				break;
-			case WM_CREATE:
-				SetWindowPos(hWnd, HWND_TOPMOST, 300, 300, 480, 360, FALSE);
-				//MoveWindow(hWnd, 300, 300, 480, 360, TRUE);
-			case WM_PAINT:
-				PAINTSTRUCT pc;
 
-				BeginPaint(hWnd, &pc);
-				GetWindowRect(hWnd, &rc);
-				GetClientRect(hWnd, &rc);
-				rc.top += 2;
-				rc.left += 2;
-				rc.bottom -= 2;
-				rc.right -= 2;
-				FillRect(pc.hdc, &rc, CreateSolidBrush(RGB(0, 0, 0)));
-				EndPaint(hWnd, &pc);
-				break;
-			default:
-				return DefWindowProcW(hWnd, msg, wParam, lParam);
-			}
-			return 0;
-		}
+
+
 
 		WORD create(PCWSTR wndName, int X, int Y)
 		{
@@ -87,51 +233,11 @@ namespace BlankWindow
 			return TRUE;
 		}
 
-		BOOL show(int nShowCmd)
-		{
-			ShowWindow(hWnd, nShowCmd);
-			UpdateWindow(hWnd);
-			return TRUE;
-		}
-
-		WORD createAndShow(PCWSTR wndName, int nShowCmd)
-		{
-
-			create(wndName, 480, 360);
-			show(nShowCmd);
-			return TRUE;
-		}
 
 
-
-		int Run(const std::function<void(DWORD)> func)
-		{
-			MSG msg;
-			static DWORD lastTime = GetTickCount();
-
-			//初始化消息结构
-			ZeroMemory(&msg, sizeof(MSG));
-
-			while (msg.message != WM_QUIT)
-			{
-				if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
-				{
-					TranslateMessage(&msg);
-					DispatchMessageW(&msg);
-				}
-				else
-				{
-					DWORD  currTime = GetTickCount();
-					func(currTime - lastTime);
-					lastTime = currTime;
-					Sleep(10);
-				}
-			}
-			return int(msg.wParam);
-		}
 
 	};
-	struct Window {};
+
 
 
 	bool InitializeD3D(HWND hWnd, bool fullscreen, ComPtr<IDirect3D9> &dx9Obj, ComPtr<IDirect3DDevice9> &dx9Device)
@@ -159,17 +265,21 @@ namespace BlankWindow
 		vp = (caps.DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) ? D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
 		HRESULT hr = dx9Obj->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, vp, &d3dpp, &pDevice);
 		dx9Device.Attach(pDevice);
+		// 设置设备状态
+		//dx9Device->SetRenderState(D3DRS_LIGHTING, FALSE);// 没有设置光源，关掉关照处理。
+
 		return FAILED(hr) ? false : true;
 	}
 
-	bool InitializeObjects(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuffer9> &dx9VB, size_t vertexArrSize, void * vertexArrPtr, DWORD d3dfvfStyle)
+	bool InitializeObjects(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuffer9> &dx9VB,
+		size_t vertexArrSize, void * vertexArrPtr, DWORD d3dfvfStyle)
 	{
 		IDirect3DVertexBuffer9 *pVB;
 		// Create the vertex buffer.  
 		if (FAILED(dx9Device->CreateVertexBuffer(vertexArrSize, 0, d3dfvfStyle, D3DPOOL_DEFAULT, &pVB, NULL))) return false;
 		// Fill the vertex buffer.  
 		void *ptr;
-		if (FAILED(pVB->Lock(0, vertexArrSize, (void**)&ptr, 0))) return false;
+		if (FAILED(pVB->Lock(0, vertexArrSize, static_cast<void**>(&ptr), 0))) return false;
 		memcpy(ptr, vertexArrPtr, vertexArrSize);
 		pVB->Unlock();
 		dx9VB.Attach(pVB);
@@ -180,8 +290,16 @@ namespace BlankWindow
 
 void RenderScene(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuffer9> &dx9VB, size_t VBobjSize, DWORD d3dfvfStyle)
 {
+	//**临时局部viewport
+	D3DVIEWPORT9 vp;
+	vp.Height = 480;
+	vp.Width = 360;
+	vp.X = 0;
+	vp.Y = 0;
+
+	//** end
 	// Clear the backbuffer.  
-	dx9Device->Clear(0, NULL, D3DCLEAR_TARGET,
+	dx9Device->Clear(0, nullptr, D3DCLEAR_TARGET,
 		D3DCOLOR_XRGB(0x66, 0x99, 0xff), 1.0f, 0);
 	// Begin the scene. Start rendering.  
 	dx9Device->BeginScene();
@@ -189,17 +307,13 @@ void RenderScene(ComPtr<IDirect3DDevice9> &dx9Device, ComPtr<IDirect3DVertexBuff
 	// Render object.  
 	dx9Device->SetStreamSource(0, dx9VB.Get(), 0, VBobjSize);
 	dx9Device->SetFVF(d3dfvfStyle);
+	dx9Device->SetViewport(&vp);
 	dx9Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
-
-	//
-	dx9Device->SetFVF(d3dfvfStyle);
-	dx9Device->DrawPrimitive(D3DPT_LINELIST, 0, 2);
-	//
 
 	// End the scene. Stop rendering.  
 	dx9Device->EndScene();
 	// Display the scene.  
-	dx9Device->Present(NULL, NULL, NULL, NULL);
+	dx9Device->Present(nullptr, nullptr, nullptr, nullptr);
 
 }
 
@@ -209,17 +323,20 @@ void Shutdown(ComPtr<IDirect3D9> dx9Obj, ComPtr<IDirect3DDevice9> dx9Device, Com
 	dx9Device.Reset();
 	dx9VB.Reset();
 }
+
 int WINAPI wWinMain(
 	_In_ HINSTANCE hInst,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR lpCmdLine,
 	_In_ int nShowCmd)
 {
-	Application app;
-	app.init(L"BlankWindowClass");
-	app.createAndShow(L"标题党", nShowCmd);
+	app.init();
+	Window *window = app.createWindow(L"BlankWindow", 600, 900);
+	window->show(nShowCmd);
 
-	// Direct3D object and device.  
+
+
+	// Direct3D object and device.
 	ComPtr<IDirect3D9> dx9Obj;
 	ComPtr<IDirect3DDevice9> dx9Device;
 	ComPtr<IDirect3DSurface9> dx9Surface;
@@ -227,27 +344,27 @@ int WINAPI wWinMain(
 
 
 	// Game Object
-	struct stD3DVertex
+	struct ColorVertex
 	{
-
 		D3DVECTOR pos;
 		D3DCOLOR color;
 	};
 	const D3DCOLOR yellow = D3DCOLOR_XRGB(255, 255, 255);
 
-	stD3DVertex objData[] = {
-		{ -0.5f, 0.5f, 0.5f, yellow, },
-		{ -0.5f, -0.5f, 0.5f, yellow, },
-		{ 0.5f, 0.5f, 0.5f, yellow, },
-		{ 0.5f, -0.5f, 0.5f, yellow, } };
+	ColorVertex objData[] = {
+		{-0.5, 0.5, 0.5, yellow},
+		{-0.5, -0.5, 0.5, yellow},
+		{0.5, 0.5, 0.5, yellow},
+		{0.5, -0.5, 0.5, yellow},
+	};
 
-	const DWORD d3dfvfStyle = (D3DFVF_XYZ | D3DFVF_DIFFUSE);
+	const DWORD FVF_COLOR = (D3DFVF_XYZ | D3DFVF_DIFFUSE);
 
 
-	InitializeD3D(app.hWnd, FALSE, dx9Obj, dx9Device);
-	InitializeObjects(dx9Device, dx9VB, sizeof(objData), objData, d3dfvfStyle);
+	InitializeD3D(HWND(window), FALSE, dx9Obj, dx9Device);
+	InitializeObjects(dx9Device, dx9VB, sizeof(objData), objData, FVF_COLOR);
 
-	app.Run([&](DWORD deltaTime) // 值传递指针
+	app.Run([&]() // 值传递指针
 	{
 		//RenderScene(g_D3DDevice,g_D3DVB,sizeof(stD3DVertex), d3dfvfStyle);
 
@@ -257,7 +374,7 @@ int WINAPI wWinMain(
 		// Begin the scene. Start rendering.  
 		dx9Device->BeginScene();
 
-		RenderScene(dx9Device, dx9VB, sizeof(objData), d3dfvfStyle);
+		RenderScene(dx9Device, dx9VB, sizeof(objData), FVF_COLOR);
 		// End the scene. Stop rendering.  
 		dx9Device->EndScene();
 		// Display the scene.  

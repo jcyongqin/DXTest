@@ -2,5 +2,5 @@
 
 namespace BlankWindow
 {
-	struct Application;
+	
 }

@@ -15,6 +15,12 @@ namespace BlankWindow
 		static LRESULT CALLBACK staticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 			Window* window = reinterpret_cast<Window*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
+			if (uMsg==WM_NCCREATE)
+			{
+				window= reinterpret_cast<Window*>(LPCREATESTRUCTW(lParam)->lpCreateParams);
+				window->attach(hWnd);
+			}
+
 			if (window == nullptr)
 			{
 				return DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -38,7 +44,8 @@ namespace BlankWindow
 				}
 				break;
 			case WM_CREATE:
-				//SetWindowPos(hWnd, HWND_TOPMOST, 300, 300, 480, 360, FALSE);
+				//SetWindowPos(hWnd, HWND_TOPMOST, 300, 300, 480, 360, FALSE);.
+				rc.bottom = 123;
 				//MoveWindow(hWnd, 300, 300, 480, 360, TRUE);
 			case WM_PAINT:
 				PAINTSTRUCT pc;
@@ -85,12 +92,7 @@ namespace BlankWindow
 		{
 			registerClass(className);
 
-
-			CREATESTRUCTW cs = { 0 };
-			cs.lpCreateParams = PVOID(this);
-			//hWnd = CreateWindowW(className, wndName, WS_OVERLAPPEDWINDOW,CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, PVOID(this));
-			//hWnd = CreateWindowExW(0L, className, wndName, WS_OVERLAPPEDWINDOW,
-			auto Wnd = CreateWindowExW(0L, className, wndName, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr, hInstance, PVOID(&cs));
+			auto Wnd = CreateWindowExW(0L, className, wndName, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr, hInstance, PVOID(this));
 			this->attach(Wnd);
 			return hWnd == nullptr ? false : true;
 		}
